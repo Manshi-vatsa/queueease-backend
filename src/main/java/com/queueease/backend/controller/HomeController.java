@@ -1,13 +1,13 @@
-package com.queueease.queueease;
+package com.queueease.backend.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-public class HelloController {
+public class HomeController {
 
     @GetMapping("/")
-    public String hello() {
-        return "Hello API";
+    public String home() {
+        return "QueueEase Backend is Running!";
     }
 }
