@@ -19,12 +19,18 @@ public class UserService {
 
     public Optional<User> login(String email, String password) {
 
-        Optional<User> user = userRepository.findByEmail(email);
+    Optional<User> userOptional = userRepository.findByEmail(email);
 
-        if(user.isPresent() && user.get().getPassword().equals(password)){
-            return user;
-        }
-
+    if (userOptional.isEmpty()) {
         return Optional.empty();
     }
+
+    User user = userOptional.get();
+
+    if (user.getPassword().equals(password)) {
+        return Optional.of(user);
+    }
+
+    return Optional.empty();
+}
 }

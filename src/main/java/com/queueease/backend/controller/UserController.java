@@ -9,27 +9,29 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/auth")
 public class UserController {
 
     @Autowired
     private UserService userService;
 
+    // REGISTER USER
     @PostMapping("/register")
-    public User register(@RequestBody User user) {
+    public User registerUser(@RequestBody User user) {
         return userService.register(user);
     }
 
+    // LOGIN USER
     @PostMapping("/login")
-    public String login(@RequestBody User user) {
+public String loginUser(@RequestBody User user) {
 
-        Optional<User> existingUser =
-                userService.login(user.getEmail(), user.getPassword());
+    Optional<User> existingUser =
+            userService.login(user.getEmail(), user.getPassword());
 
-        if(existingUser.isPresent()) {
-            return "Login Successful";
-        }
-
+    if(existingUser.isPresent()) {
+        return "Login Successful";
+    } else {
         return "Invalid email or password";
     }
+}
 }
