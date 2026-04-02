@@ -5,16 +5,19 @@ import lombok.Data;
 
 @Data
 @Entity
-@Table(name = "bookings")
+@Table(name = "booking")
 public class Booking {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long bookingId;
 
+    @Column(name = "user_id")     // ✅ MUST match DB
     private Long userId;
 
+    @Column(name = "center_id")   // ✅ MUST match DB
     private Long centerId;
 
-    private int queueNumber;
+    @Column(name = "queue_number")
+    private Integer queueNumber;
 }

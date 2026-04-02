@@ -3,9 +3,14 @@ package com.queueease.backend.service;
 import com.queueease.backend.model.Booking;
 import com.queueease.backend.model.Queue;
 import com.queueease.backend.repository.BookingRepository;
-import org.springframework.stereotype.Service;
-import com.queueease.backend.dto.BookingResponse;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import com.queueease.backend.dto.BookingResponse;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 import java.util.List;
 
 @Service
@@ -20,7 +25,7 @@ public class BookingService {
     }
 
     public BookingResponse joinQueue(Long userId, Long centerId) {
-
+        System.out.println("JOIN QUEUE CALLED");
         // ✅ Validation
         if (userId == null || centerId == null) {
             throw new RuntimeException("Invalid input");
@@ -31,7 +36,7 @@ public class BookingService {
                 bookingRepository.findByUserIdAndCenterId(userId, centerId);
 
         if (!existingBookings.isEmpty()) {
-            throw new RuntimeException("User already in queue");
+           throw new ResponseStatusException(HttpStatus.CONFLICT, "User already in queue");
         }
 
         // ✅ Get & increment queue
