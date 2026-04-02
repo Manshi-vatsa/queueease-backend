@@ -1,10 +1,10 @@
 package com.queueease.backend.service;
 
-
 import com.queueease.backend.model.Booking;
 import com.queueease.backend.model.Queue;
 import com.queueease.backend.repository.BookingRepository;
 import org.springframework.stereotype.Service;
+import com.queueease.backend.dto.BookingResponse;
 
 import java.util.List;
 
@@ -19,15 +19,46 @@ public class BookingService {
         this.queueService = queueService;
     }
 
-    public Booking joinQueue(Long userId, Long centerId) {
+    public BookingResponse joinQueue(Long userId, Long centerId) {
+
+        // ✅ Validation
+        if (userId == null || centerId == null) {
+            throw new RuntimeException("Invalid input");
+        }
+
+        // ✅ Duplicate check
+        List<Booking> existingBookings =
+                bookingRepository.findByUserIdAndCenterId(userId, centerId);
+
+        if (!existingBookings.isEmpty()) {
+            throw new RuntimeException("User already in queue");
+        }
+
+        // ✅ Get & increment queue
         Queue queue = queueService.incrementQueue(centerId);
 
+        // 🔥 FIX: handle NULL currentNumber
+        if (queue.getCurrentNumber() == null) {
+            queue.setCurrentNumber(1);
+        }
+
+        int queueNumber = queue.getCurrentNumber();
+
+        // ✅ Create booking
         Booking booking = new Booking();
         booking.setUserId(userId);
         booking.setCenterId(centerId);
-        booking.setQueueNumber(queue.getCurrentServingNumber());
+        booking.setQueueNumber(queueNumber);
 
-        return bookingRepository.save(booking);
+        Booking savedBooking = bookingRepository.save(booking);
+
+        // ✅ Response
+        BookingResponse response = new BookingResponse();
+        response.setUserId(userId);
+        response.setQueueNumber(savedBooking.getQueueNumber());
+        response.setMessage("Successfully joined queue");
+
+        return response;
     }
 
     public List<Booking> getUserBookings(Long userId) {
