@@ -27,27 +27,36 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        http
-            .csrf(csrf -> csrf.disable())
+    http
+        .csrf(csrf -> csrf.disable())
 
-            .authorizeHttpRequests(auth -> auth
-                // ✅ ALWAYS FIRST
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/error").permitAll()
-                .requestMatchers("/api/queue/**").hasRole("USER")
+        // ✅ IMPORTANT for H2 console
+        .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 
-                // ✅ ALWAYS LAST
-                .anyRequest().authenticated()
-            )
+        .authorizeHttpRequests(auth -> auth
+            // ✅ Allow auth APIs
+            .requestMatchers("/api/auth/**").permitAll()
 
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
+            // ✅ Allow H2 console
+            .requestMatchers("/h2-console/**").permitAll()
 
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+            .requestMatchers("/error").permitAll()
 
-        return http.build();
-    }
+            // ✅ Your existing protected API (UNCHANGED)
+            .requestMatchers("/api/queue/**").hasRole("USER")
+
+            // ✅ Everything else requires auth (UNCHANGED)
+            .anyRequest().authenticated()
+        )
+
+        .sessionManagement(session ->
+            session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+        )
+
+        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
+    return http.build();
+}
 }

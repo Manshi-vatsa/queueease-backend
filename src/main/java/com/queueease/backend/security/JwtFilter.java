@@ -25,58 +25,58 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                   HttpServletResponse response,
-                                   FilterChain filterChain)
-            throws ServletException, IOException {
+protected void doFilterInternal(HttpServletRequest request,
+                               HttpServletResponse response,
+                               FilterChain filterChain)
+        throws ServletException, IOException {
 
-        System.out.println("🔥 JWT FILTER HIT");
+    System.out.println("🔥 JWT FILTER HIT");
 
-        String path = request.getRequestURI();
-       System.out.println("PATH: " + request.getRequestURI());
+    String path = request.getRequestURI();
+    System.out.println("PATH: " + path);
 
-        if (path.startsWith("/api/auth")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        String authHeader = request.getHeader("Authorization");
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            System.out.println("❌ No token");
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return;
-        }
-
-        String token = authHeader.substring(7);
-
-        try {
-            String email = jwtUtil.extractEmail(token);
-
-            System.out.println("EMAIL: " + email);
-            System.out.println("VALID: " + jwtUtil.validateToken(token, email));
-
-            if (jwtUtil.validateToken(token, email)) {
-
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                email,
-                                null,
-                                List.of(new SimpleGrantedAuthority("ROLE_USER"))
-                        );
-
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-
-                System.out.println("✅ AUTH SET: ROLE_USER");
-                System.out.println("Authorities: " + authToken.getAuthorities());
-            }
-
-        } catch (Exception e) {
-            System.out.println("❌ TOKEN ERROR: " + e.getMessage());
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return;
-        }
-
+    // ✅ Skip JWT for auth + H2 console
+    if (path.startsWith("/api/auth") || path.startsWith("/h2-console")) {
         filterChain.doFilter(request, response);
+        return;
     }
+
+    String authHeader = request.getHeader("Authorization");
+
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        System.out.println("❌ No token");
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        return;
+    }
+
+    String token = authHeader.substring(7);
+
+    try {
+        String email = jwtUtil.extractEmail(token);
+
+        System.out.println("EMAIL: " + email);
+        System.out.println("VALID: " + jwtUtil.validateToken(token, email));
+
+        if (jwtUtil.validateToken(token, email)) {
+
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(
+                            email,
+                            null,
+                            List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                    );
+
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+
+            System.out.println("✅ AUTH SET: ROLE_USER");
+        }
+
+    } catch (Exception e) {
+        System.out.println("❌ TOKEN ERROR: " + e.getMessage());
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        return;
+    }
+
+    filterChain.doFilter(request, response);
+}
 }
