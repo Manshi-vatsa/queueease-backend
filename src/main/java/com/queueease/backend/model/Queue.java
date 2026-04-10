@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 
 @Entity
 public class Queue {
-
+    private Integer avgServiceTime = 5;
     @Id
 @GeneratedValue(strategy = GenerationType.IDENTITY)
 @Column(name = "queue_id")   // 🔥 VERY IMPORTANT
@@ -46,4 +46,12 @@ private Long id;
     public void setCurrentServingNumber(Integer currentServingNumber) {
         this.currentServingNumber = currentServingNumber;
     }
+    
+    public Integer getAvgServiceTime() {
+    return avgServiceTime;}
+
+
+public void setAvgServiceTime(Integer avgServiceTime) {
+    this.avgServiceTime = avgServiceTime;
+}
 }

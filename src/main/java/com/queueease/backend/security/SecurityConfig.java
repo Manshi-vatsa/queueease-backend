@@ -27,36 +27,40 @@ public class SecurityConfig {
     }
 
     @Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-    http
-        .csrf(csrf -> csrf.disable())
+        http
+            .csrf(csrf -> csrf.disable())
 
-        // ✅ IMPORTANT for H2 console
-        .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+            // ✅ IMPORTANT for H2 console
+            .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 
-        .authorizeHttpRequests(auth -> auth
-            // ✅ Allow auth APIs
-            .requestMatchers("/api/auth/**").permitAll()
+            .authorizeHttpRequests(auth -> auth
+                // ✅ Allow auth APIs
+                .requestMatchers("/api/auth/**").permitAll()
 
-            // ✅ Allow H2 console
-            .requestMatchers("/h2-console/**").permitAll()
+                // ✅ Allow H2 console
+                .requestMatchers("/h2-console/**").permitAll()
 
-            .requestMatchers("/error").permitAll()
+                // ✅ Allow error
+                .requestMatchers("/error").permitAll()
 
-            // ✅ Your existing protected API (UNCHANGED)
-            .requestMatchers("/api/queue/**").hasRole("USER")
+                // ✅ ✅ ADD THIS LINE (ONLY CHANGE)
+                .requestMatchers("/test").permitAll()
 
-            // ✅ Everything else requires auth (UNCHANGED)
-            .anyRequest().authenticated()
-        )
+                // ✅ Your existing protected API (UNCHANGED)
+                .requestMatchers("/api/queue/**").hasRole("USER")
 
-        .sessionManagement(session ->
-            session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-        )
+                // ✅ Everything else requires auth (UNCHANGED)
+                .anyRequest().authenticated()
+            )
 
-        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
 
-    return http.build();
-}
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
 }

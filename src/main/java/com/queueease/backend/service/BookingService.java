@@ -2,6 +2,7 @@ package com.queueease.backend.service;
 
 import com.queueease.backend.model.Booking;
 import com.queueease.backend.model.Queue;
+import com.queueease.backend.mongo.QueueActivityService;
 import com.queueease.backend.repository.BookingRepository;
 
 import org.springframework.http.HttpStatus;
@@ -13,29 +14,38 @@ import java.util.List;
 
 @Service
 public class BookingService {
-
+     private final QueueActivityService activityService;
     private final BookingRepository bookingRepository;
     private final QueueService queueService;
+    
 
-    public BookingService(BookingRepository bookingRepository, QueueService queueService) {
-        this.bookingRepository = bookingRepository;
-        this.queueService = queueService;
-    }
+   public BookingService(BookingRepository bookingRepository,
+                      QueueService queueService,
+                      QueueActivityService activityService) {
+    this.bookingRepository = bookingRepository;
+    this.queueService = queueService;
+    this.activityService = activityService;
+}
 
     // ✅ EXISTING (UNCHANGED)
     public BookingResponse joinQueue(Long userId, Long centerId) {
         System.out.println("JOIN QUEUE CALLED");
-
+      
         if (userId == null || centerId == null) {
             throw new RuntimeException("Invalid input");
         }
-
         List<Booking> existingBookings =
-                bookingRepository.findByUserIdAndCenterId(userId, centerId);
+        bookingRepository.findByUserIdAndCenterId(userId, centerId);
 
-        if (!existingBookings.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "User already in queue");
-        }
+// ✅ NEW LOGIC (ALLOW REJOIN IF ALREADY SERVED)
+boolean activeBookingExists = existingBookings.stream()
+    .anyMatch(b -> b.getQueueNumber() >= queueService
+        .getQueueByCenterId(centerId)
+        .getCurrentServingNumber());
+
+if (activeBookingExists) {
+    throw new ResponseStatusException(HttpStatus.CONFLICT, "User already in queue");
+}
 
         Queue queue = queueService.incrementQueue(centerId);
 
@@ -56,6 +66,8 @@ public class BookingService {
         response.setUserId(userId);
         response.setQueueNumber(savedBooking.getQueueNumber());
         response.setMessage("Successfully joined queue");
+
+         activityService.log(userId, centerId, "JOIN_QUEUE");
 
         return response;
     }
@@ -92,7 +104,7 @@ public class BookingService {
         int peopleAhead = queueNumber - currentServing;
         if (peopleAhead < 0) peopleAhead = 0;
 
-        int avgServiceTime = 5; // minutes
+       int avgServiceTime = (int) activityService.getAverageServiceTime(centerId);
         int waitTime = peopleAhead * avgServiceTime;
 
         // 🔹 Build response
@@ -101,6 +113,18 @@ public class BookingService {
         response.setCurrentServing(currentServing);
         response.setPeopleAhead(peopleAhead);
         response.setEstimatedWaitTime(waitTime);
+
+        String recommendation;
+
+if (waitTime > 30) {
+    recommendation = "Come later";
+} else if (waitTime < 10) {
+    recommendation = "Come now";
+} else {
+    recommendation = "You can plan accordingly";
+}
+
+response.setRecommendation(recommendation);
 
         return response;
     }

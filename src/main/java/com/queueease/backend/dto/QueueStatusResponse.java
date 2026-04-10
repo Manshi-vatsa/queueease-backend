@@ -1,6 +1,7 @@
 package com.queueease.backend.dto;
 
 public class QueueStatusResponse {
+    private String recommendation;
     private int queueNumber;
     private int currentServing;     
     private int peopleAhead;
@@ -23,13 +24,20 @@ public class QueueStatusResponse {
     public void setPeopleAhead(int peopleAhead) {
         this.peopleAhead = peopleAhead;
     }
-    public int getEstimatedWaitTime() {
-        return estimatedWaitTime;
-    }
-    public void setEstimatedWaitTime(int estimatedWaitTime) {
-        this.estimatedWaitTime = estimatedWaitTime;
-    }
+   public int getEstimatedWaitTime() {
+    return estimatedWaitTime;
+}
+
+public void setEstimatedWaitTime(int estimatedWaitTime) {
+    this.estimatedWaitTime = estimatedWaitTime;
+}
     
-    
+    public String getRecommendation() {
+    return recommendation;
+}
+
+public void setRecommendation(String recommendation) {
+    this.recommendation = recommendation;
+}
     
 }
