@@ -1,5 +1,5 @@
 package com.queueease.backend.dto;
-
+import com.fasterxml.jackson.annotation.JsonProperty;
 public class QueueStatusResponse {
     private String recommendation;
     private int queueNumber;

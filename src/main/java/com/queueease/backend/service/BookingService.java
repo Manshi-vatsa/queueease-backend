@@ -80,52 +80,55 @@ if (activeBookingExists) {
     // ✅ NEW METHOD (ADDED SAFELY)
     public QueueStatusResponse getQueueStatus(Long userId, Long centerId) {
 
-        // 🔹 Get latest booking for this user & center
-        List<Booking> bookings =
-                bookingRepository.findByUserIdAndCenterId(userId, centerId);
+    List<Booking> bookings =
+            bookingRepository.findByUserIdAndCenterId(userId, centerId);
 
-        if (bookings.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
-        }
-
-        // 👉 Take latest booking
-        Booking booking = bookings.get(bookings.size() - 1);
-
-        // 🔹 Get queue (already handled by your QueueService)
-        Queue queue = queueService.getQueueByCenterId(centerId);
-
-        if (queue == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Queue not found");
-        }
-
-        int queueNumber = booking.getQueueNumber();
-        int currentServing = queue.getCurrentServingNumber();
-
-        int peopleAhead = queueNumber - currentServing;
-        if (peopleAhead < 0) peopleAhead = 0;
-
-       int avgServiceTime = (int) activityService.getAverageServiceTime(centerId);
-        int waitTime = peopleAhead * avgServiceTime;
-
-        // 🔹 Build response
-        QueueStatusResponse response = new QueueStatusResponse();
-        response.setQueueNumber(queueNumber);
-        response.setCurrentServing(currentServing);
-        response.setPeopleAhead(peopleAhead);
-        response.setEstimatedWaitTime(waitTime);
-
-        String recommendation;
-
-if (waitTime > 30) {
-    recommendation = "Come later";
-} else if (waitTime < 10) {
-    recommendation = "Come now";
-} else {
-    recommendation = "You can plan accordingly";
-}
-
-response.setRecommendation(recommendation);
-
-        return response;
+    if (bookings.isEmpty()) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
     }
+
+    Booking booking = bookings.get(bookings.size() - 1);
+
+    Queue queue = queueService.getQueueByCenterId(centerId);
+
+    int queueNumber = booking.getQueueNumber();
+    int currentServing = queue.getCurrentServingNumber();
+
+    // ✅ FIXED
+    int peopleAhead = queueNumber - currentServing - 1;
+    if (peopleAhead < 0) peopleAhead = 0;
+
+    // ✅ SAFE AVG TIME
+    Double avgTime = activityService.getAverageServiceTime(centerId);
+
+    int avgServiceTime;
+    if (avgTime == null || avgTime == 0) {
+        avgServiceTime = 5; // fallback
+    } else {
+        avgServiceTime = avgTime.intValue();
+    }
+
+    int waitTime = peopleAhead * avgServiceTime;
+
+    QueueStatusResponse response = new QueueStatusResponse();
+    response.setQueueNumber(queueNumber);
+    response.setCurrentServing(currentServing);
+    response.setPeopleAhead(peopleAhead);
+    response.setEstimatedWaitTime(waitTime);
+
+    String recommendation;
+
+    if (waitTime > 30) {
+        recommendation = "Come later";
+    } else if (waitTime < 10) {
+        recommendation = "Come now";
+    } else {
+        recommendation = "You can plan accordingly";
+    }
+
+    response.setRecommendation(recommendation);
+
+    return response;
+}
+    
 }
