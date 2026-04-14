@@ -12,10 +12,10 @@ public class Booking {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long bookingId;
 
-    @Column(name = "user_id")     // ✅ MUST match DB
+    @Column(name = "user_id")
     private Long userId;
 
-    @Column(name = "center_id")   // ✅ MUST match DB
+    @Column(name = "center_id")
     private Long centerId;
 
     @Column(name = "queue_number")

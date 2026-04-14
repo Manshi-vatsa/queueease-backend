@@ -1,52 +1,80 @@
 package com.queueease.backend.service;
 
+import com.queueease.backend.model.Booking;
 import com.queueease.backend.model.Queue;
+import com.queueease.backend.repository.BookingRepository;
 import com.queueease.backend.repository.QueueRepository;
-
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
 
 @Service
 public class QueueService {
 
     private final QueueRepository queueRepository;
+    private final BookingRepository bookingRepository;
 
-    public QueueService(QueueRepository queueRepository) {
+    public QueueService(QueueRepository queueRepository,
+                        BookingRepository bookingRepository) {
         this.queueRepository = queueRepository;
+        this.bookingRepository = bookingRepository;
     }
-
-    // ✅ Get or create queue
-    public Queue getQueueByCenterId(Long centerId) {
-        return queueRepository.findByCenterId(centerId).orElseGet(() -> {
-            Queue q = new Queue();
-            q.setCenterId(centerId);
-            q.setCurrentNumber(0);              // ✅ ADD THIS
-            q.setCurrentServingNumber(0);
-            return queueRepository.save(q);
-        });
-    }
-    public Queue getOrCreateQueue(Long centerId) {
-    return queueRepository.findByCenterId(centerId)
-        .orElseGet(() -> {
-            Queue newQueue = new Queue();
-            newQueue.setCenterId(centerId);
-            newQueue.setCurrentServingNumber(0);
-            newQueue.setCurrentNumber(0);
-            return queueRepository.save(newQueue);
-        });
+     public Queue updateQueue(Queue queue) {
+    return queueRepository.save(queue);
 }
+    // ✅ Get or create queue
+    public Queue getOrCreateQueue(Long centerId) {
+        return queueRepository.findByCenterId(centerId)
+                .orElseGet(() -> {
+                    Queue queue = new Queue();
+                    queue.setCenterId(centerId);
+                    queue.setCurrentNumber(0);
+                    queue.setCurrentServingNumber(0);
+                    return queueRepository.save(queue);
+                });
+    }
 
-    // ✅ Increment when user joins
-  public Queue incrementQueue(Long centerId) {
+    // ✅ JOIN QUEUE (FINAL)
+    public Booking joinQueue(Long userId, Long centerId) {
 
-   Queue queue = queueRepository.findByCenterId(centerId)
-        .orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Queue not found for centerId: " + centerId
-        ));
+        // 🔴 Remove old booking (avoid 409)
+        List<Booking> existing =
+                bookingRepository.findByUserIdAndCenterId(userId, centerId);
 
-    // ✅ Correct field to increment
+        if (!existing.isEmpty()) {
+            bookingRepository.deleteAll(existing);
+        }
+
+        Queue queue = getOrCreateQueue(centerId);
+
+        if (queue.getCurrentNumber() == null) {
+            queue.setCurrentNumber(0);
+        }
+
+        int nextNumber = queue.getCurrentNumber() + 1;
+        queue.setCurrentNumber(nextNumber);
+
+        queueRepository.save(queue);
+
+        // 🔥 SAVE BOOKING
+        Booking booking = new Booking();
+        booking.setUserId(userId);
+        booking.setCenterId(centerId);
+        booking.setQueueNumber(nextNumber);
+
+        System.out.println("Saving booking: " + booking);
+
+        Booking saved = bookingRepository.save(booking);
+
+        System.out.println("Saved successfully");
+
+        return saved;
+    }
+
+    public Queue incrementQueue(Long centerId) {
+
+    Queue queue = getOrCreateQueue(centerId);
+
     if (queue.getCurrentNumber() == null) {
         queue.setCurrentNumber(1);
     } else {
@@ -55,4 +83,9 @@ public class QueueService {
 
     return queueRepository.save(queue);
 }
+
+    // ✅ GET QUEUE LIST
+    public List<Booking> getQueueList(Long centerId) {
+        return bookingRepository.findByCenterIdOrderByQueueNumberAsc(centerId);
+    }
 }

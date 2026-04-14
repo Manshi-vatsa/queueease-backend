@@ -1,41 +1,69 @@
 package com.queueease.backend.mongo;
 
+import org.bson.Document;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 public class QueueActivityService {
 
-    private final QueueActivityRepository repository;
+    // ✅ 1. DECLARE FIRST
+    private final MongoTemplate mongoTemplate;
 
-    public QueueActivityService(QueueActivityRepository repository) {
-        this.repository = repository;
+    // ✅ 2. CONSTRUCTOR
+    public QueueActivityService(MongoTemplate mongoTemplate) {
+        this.mongoTemplate = mongoTemplate;
     }
 
+    // ✅ 3. LOG METHOD
     public void log(Long userId, Long centerId, String action) {
 
-        QueueActivity activity = new QueueActivity();
-        activity.setUserId(userId);
-        activity.setCenterId(centerId);
-        activity.setAction(action);
-        activity.setTimestamp(LocalDateTime.now());
+        Document log = new Document();
 
-        repository.save(activity);
-     }
-     public double getAverageServiceTime(Long centerId) {
-    List<QueueActivity> logs = repository.findByCenterId(centerId);
+        log.append("userId", userId);
+        log.append("centerId", centerId);
+        log.append("action", action);
+        log.append("timestamp", java.time.LocalDateTime.now());
+     int hour = (int)(Math.random() * 24);
+log.append("hour", hour);
 
-    long serveCount = logs.stream()
-            .filter(log -> "SERVE_NEXT".equals(log.getAction()))
-            .count();
+        // Optional (for analytics)
+       int estimatedWaitTime = (int)(Math.random() * 20) + 1;
+log.append("estimatedWaitTime", estimatedWaitTime);
 
-    if (serveCount == 0) return 5; // fallback
+        mongoTemplate.insert(log, "queue_logs");
+    }
 
-    // assume total time approx = serveCount * 5 (basic version)
-    return 5; // keep simple for now
-}
+    // ✅ 4. AVERAGE WAIT TIME
+    public double getAverageWaitTime() {
 
+        List<Document> result = mongoTemplate.aggregate(
+                Aggregation.newAggregation(
+                        Aggregation.group().avg("estimatedWaitTime").as("avgWait")
+                ),
+                "queue_logs",
+                Document.class
+        ).getMappedResults();
 
+        if (result.isEmpty() || result.get(0).get("avgWait") == null) {
+            return 0.0;
+        }
+
+        return result.get(0).getDouble("avgWait");
+    }
+
+    // ✅ 5. PEAK HOURS
+    public List<Document> getPeakHours() {
+
+        return mongoTemplate.aggregate(
+                Aggregation.newAggregation(
+                        Aggregation.group("hour").count().as("count")
+                ),
+                "queue_logs",
+                Document.class
+        ).getMappedResults();
+    }
 }

@@ -4,131 +4,112 @@ import com.queueease.backend.model.Booking;
 import com.queueease.backend.model.Queue;
 import com.queueease.backend.mongo.QueueActivityService;
 import com.queueease.backend.repository.BookingRepository;
+import com.queueease.backend.dto.QueueStatusResponse;
+import com.queueease.backend.dto.BookingResponse;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import com.queueease.backend.dto.QueueStatusResponse;
-import com.queueease.backend.dto.BookingResponse;
+
 import java.util.List;
 
 @Service
 public class BookingService {
-     private final QueueActivityService activityService;
+
     private final BookingRepository bookingRepository;
     private final QueueService queueService;
-    
+    private final QueueActivityService activityService;
 
-   public BookingService(BookingRepository bookingRepository,
-                      QueueService queueService,
-                      QueueActivityService activityService) {
-    this.bookingRepository = bookingRepository;
-    this.queueService = queueService;
-    this.activityService = activityService;
-}
+    public BookingService(BookingRepository bookingRepository,
+                          QueueService queueService,
+                          QueueActivityService activityService) {
+        this.bookingRepository = bookingRepository;
+        this.queueService = queueService;
+        this.activityService = activityService;
+    }
 
-    // ✅ EXISTING (UNCHANGED)
+    // ✅ JOIN QUEUE (SAFE VERSION)
     public BookingResponse joinQueue(Long userId, Long centerId) {
-        System.out.println("JOIN QUEUE CALLED");
-      
-        if (userId == null || centerId == null) {
-            throw new RuntimeException("Invalid input");
-        }
-        List<Booking> existingBookings =
-        bookingRepository.findByUserIdAndCenterId(userId, centerId);
 
-// ✅ NEW LOGIC (ALLOW REJOIN IF ALREADY SERVED)
-boolean activeBookingExists = existingBookings.stream()
-    .anyMatch(b -> b.getQueueNumber() >= queueService
-        .getQueueByCenterId(centerId)
-        .getCurrentServingNumber());
+        List<Booking> existing =
+                bookingRepository.findByUserIdAndCenterId(userId, centerId);
 
-if (activeBookingExists) {
-    throw new ResponseStatusException(HttpStatus.CONFLICT, "User already in queue");
-}
+        Queue queue = queueService.getOrCreateQueue(centerId);
 
-        Queue queue = queueService.incrementQueue(centerId);
+        int currentServing = queue.getCurrentServingNumber() == null
+                ? 0
+                : queue.getCurrentServingNumber();
 
-        if (queue.getCurrentNumber() == null) {
-            queue.setCurrentNumber(1);
+        boolean activeBookingExists = existing.stream()
+                .anyMatch(b -> b.getQueueNumber() >= currentServing);
+
+        if (activeBookingExists) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Already in queue");
         }
 
-        int queueNumber = queue.getCurrentNumber();
+        // ✅ FIXED PART
+Queue updatedQueue = queueService.incrementQueue(centerId);
+int nextNumber = updatedQueue.getCurrentNumber();
 
-        Booking booking = new Booking();
-        booking.setUserId(userId);
-        booking.setCenterId(centerId);
-        booking.setQueueNumber(queueNumber);
+Booking booking = new Booking();
+booking.setUserId(userId);
+booking.setCenterId(centerId);
+booking.setQueueNumber(nextNumber);
 
-        Booking savedBooking = bookingRepository.save(booking);
+        Booking saved = bookingRepository.save(booking);
+
+        activityService.log(userId, centerId, "JOIN_QUEUE");
 
         BookingResponse response = new BookingResponse();
         response.setUserId(userId);
-        response.setQueueNumber(savedBooking.getQueueNumber());
-        response.setMessage("Successfully joined queue");
-
-         activityService.log(userId, centerId, "JOIN_QUEUE");
+        response.setQueueNumber(saved.getQueueNumber());
+        response.setMessage("Joined successfully");
 
         return response;
     }
 
-    // ✅ EXISTING (UNCHANGED)
+    // ✅ USER BOOKINGS
     public List<Booking> getUserBookings(Long userId) {
         return bookingRepository.findByUserId(userId);
     }
 
-    // ✅ NEW METHOD (ADDED SAFELY)
+    // ✅ QUEUE STATUS
     public QueueStatusResponse getQueueStatus(Long userId, Long centerId) {
 
-    List<Booking> bookings =
-            bookingRepository.findByUserIdAndCenterId(userId, centerId);
+        List<Booking> bookings =
+                bookingRepository.findByUserIdAndCenterId(userId, centerId);
 
-    if (bookings.isEmpty()) {
-        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+        if (bookings.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found");
+        }
+
+        Booking booking = bookings.get(bookings.size() - 1);
+        Queue queue = queueService.getOrCreateQueue(centerId);
+
+        int queueNumber = booking.getQueueNumber();
+        int currentServing = queue.getCurrentServingNumber() == null ? 0 : queue.getCurrentServingNumber();
+
+        int peopleAhead = Math.max(queueNumber - currentServing - 1, 0);
+
+        Double avgTime = activityService.getAverageWaitTime();
+        int avgServiceTime = (avgTime == null || avgTime == 0) ? 5 : avgTime.intValue();
+
+        int waitTime = peopleAhead * avgServiceTime;
+
+        QueueStatusResponse response = new QueueStatusResponse();
+        response.setQueueNumber(queueNumber);
+        response.setCurrentServing(currentServing);
+        response.setPeopleAhead(peopleAhead);
+        response.setEstimatedWaitTime(waitTime);
+
+        if (waitTime > 30) {
+            response.setRecommendation("Come later");
+        } else if (waitTime < 10) {
+            response.setRecommendation("Come now");
+        } else {
+            response.setRecommendation("Plan accordingly");
+        }
+
+        return response;
     }
-
-    Booking booking = bookings.get(bookings.size() - 1);
-
-    Queue queue = queueService.getQueueByCenterId(centerId);
-
-    int queueNumber = booking.getQueueNumber();
-    int currentServing = queue.getCurrentServingNumber();
-
-    // ✅ FIXED
-    int peopleAhead = queueNumber - currentServing - 1;
-    if (peopleAhead < 0) peopleAhead = 0;
-
-    // ✅ SAFE AVG TIME
-    Double avgTime = activityService.getAverageServiceTime(centerId);
-
-    int avgServiceTime;
-    if (avgTime == null || avgTime == 0) {
-        avgServiceTime = 5; // fallback
-    } else {
-        avgServiceTime = avgTime.intValue();
-    }
-
-    int waitTime = peopleAhead * avgServiceTime;
-
-    QueueStatusResponse response = new QueueStatusResponse();
-    response.setQueueNumber(queueNumber);
-    response.setCurrentServing(currentServing);
-    response.setPeopleAhead(peopleAhead);
-    response.setEstimatedWaitTime(waitTime);
-
-    String recommendation;
-
-    if (waitTime > 30) {
-        recommendation = "Come later";
-    } else if (waitTime < 10) {
-        recommendation = "Come now";
-    } else {
-        recommendation = "You can plan accordingly";
-    }
-
-    response.setRecommendation(recommendation);
-
-    return response;
-}
-    
 }

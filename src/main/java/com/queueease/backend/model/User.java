@@ -13,13 +13,20 @@ public class User {
     @Column(name="name")
     private String name;
 
-    @Column(name="email")
-    private String email;
+    // ✅ ADD ROLE (IMPORTANT)
+    @Column(name = "role")
+    private String role;
 
     @Column(name="password")
     private String password;
 
+    // ✅ UNIQUE EMAIL (CORRECT FOR JPA)
+    @Column(unique = true)
+    private String email;
+
     public User() {}
+
+    // ✅ GETTERS & SETTERS
 
     public Long getId() {
         return id;
@@ -35,6 +42,14 @@ public class User {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 
     public String getEmail() {

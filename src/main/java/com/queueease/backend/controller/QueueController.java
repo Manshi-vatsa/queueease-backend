@@ -1,16 +1,14 @@
 package com.queueease.backend.controller;
 
-import com.queueease.backend.repository.QueueRepository;
-import com.queueease.backend.repository.BookingRepository; // ✅ ADDED
 import com.queueease.backend.model.Queue;
 import com.queueease.backend.model.Booking;
 import com.queueease.backend.service.BookingService;
 import com.queueease.backend.service.QueueService;
 import com.queueease.backend.mongo.QueueActivityService;
-import com.queueease.backend.dto.BookingResponse;
 import com.queueease.backend.dto.QueueStatusResponse;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -22,32 +20,32 @@ public class QueueController {
 
     private final QueueService queueService;
     private final BookingService bookingService;
-    private final QueueRepository queueRepository;
     private final QueueActivityService activityService;
-    private final BookingRepository bookingRepository; // ✅ ADDED
 
-    // ✅ UPDATED CONSTRUCTOR
-    public QueueController(BookingService bookingService,
-                           QueueRepository queueRepository,
-                           QueueService queueService,
-                           QueueActivityService activityService,
-                           BookingRepository bookingRepository) { // ✅ ADDED
-        this.bookingService = bookingService;
-        this.queueRepository = queueRepository;
+    public QueueController(QueueService queueService,
+                           BookingService bookingService,
+                           QueueActivityService activityService) {
         this.queueService = queueService;
+        this.bookingService = bookingService;
         this.activityService = activityService;
-        this.bookingRepository = bookingRepository; // ✅ ADDED
     }
 
-    // ✅ JOIN QUEUE (UNCHANGED)
+    // ✅ JOIN QUEUE (FINAL CLEAN)
     @PostMapping("/joinQueue")
-    public BookingResponse joinQueue(@RequestParam Long userId,
-                                     @RequestParam Long centerId) {
-        return bookingService.joinQueue(userId, centerId);
+    public ResponseEntity<?> joinQueue(
+            @RequestParam Long userId,
+            @RequestParam Long centerId) {
+
+        Booking booking = queueService.joinQueue(userId, centerId);
+
+        // optional logging
+        activityService.log(userId, centerId, "JOIN_QUEUE");
+
+        return ResponseEntity.ok(booking);
     }
 
-    // ✅ SERVE NEXT (UPDATED WITH DELETE LOGIC)
-    @PostMapping("/serveNext/{centerId}")
+    // ✅ SERVE NEXT
+    @PutMapping("/serveNext/{centerId}")
     public Queue serveNext(@PathVariable Long centerId) {
 
         Queue queue = queueService.getOrCreateQueue(centerId);
@@ -57,35 +55,28 @@ public class QueueController {
         }
 
         if (queue.getCurrentServingNumber() >= queue.getCurrentNumber()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No more people in queue");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "No more people in queue"
+            );
         }
 
-        // ✅ INCREMENT
         queue.setCurrentServingNumber(queue.getCurrentServingNumber() + 1);
 
-        // ✅ ADD THIS BLOCK (REMOVE SERVED USER)
-        Booking booking = bookingRepository
-                .findByCenterIdAndQueueNumber(centerId, queue.getCurrentServingNumber());
+        Queue updated = queueService.updateQueue(queue);
 
-        if (booking != null) {
-            bookingRepository.delete(booking);
-        }
-
-        Queue updatedQueue = queueRepository.save(queue);
-
-        // ✅ LOG AFTER SUCCESS
         activityService.log(null, centerId, "SERVE_NEXT");
 
-        return updatedQueue;
+        return updated;
     }
 
-    // ✅ USER BOOKINGS (UNCHANGED)
+    // ✅ USER BOOKINGS
     @GetMapping("/queueStatus/{userId}")
     public List<Booking> getQueueStatus(@PathVariable Long userId) {
         return bookingService.getUserBookings(userId);
     }
 
-    // ✅ SMART STATUS (UNCHANGED)
+    // ✅ SMART STATUS
     @GetMapping("/status")
     public QueueStatusResponse getQueueStatus(
             @RequestParam Long userId,
@@ -94,15 +85,15 @@ public class QueueController {
         return bookingService.getQueueStatus(userId, centerId);
     }
 
-    // ✅ CURRENT QUEUE (UNCHANGED)
+    // ✅ QUEUE LIST
+    @GetMapping("/list")
+    public List<Booking> getQueueList(@RequestParam Long centerId) {
+        return queueService.getQueueList(centerId);
+    }
+
+    // ✅ CURRENT QUEUE
     @GetMapping("/current/{centerId}")
     public Queue getCurrentQueue(@PathVariable Long centerId) {
-        return queueRepository.findByCenterId(centerId)
-                .orElseGet(() -> {
-                    Queue newQueue = new Queue();
-                    newQueue.setCenterId(centerId);
-                    newQueue.setCurrentServingNumber(0);
-                    return queueRepository.save(newQueue);
-                });
+        return queueService.getOrCreateQueue(centerId);
     }
 }
