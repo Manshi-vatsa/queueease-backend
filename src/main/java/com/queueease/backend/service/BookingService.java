@@ -112,4 +112,53 @@ booking.setQueueNumber(nextNumber);
 
         return response;
     }
+
+    // SERVE USER - Admin-driven serving with proper validation and atomic updates
+    public QueueStatusResponse serveUser(Long userId, Long centerId) {
+        // 1. Validate user exists in queue for center
+        List<Booking> userBookings = bookingRepository.findByUserIdAndCenterId(userId, centerId);
+        if (userBookings.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found in queue for this center");
+        }
+
+        // Get the active booking (highest queue number for this user)
+        Booking userBooking = userBookings.stream()
+                .max((b1, b2) -> Integer.compare(b1.getQueueNumber(), b2.getQueueNumber()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No active booking found"));
+
+        // Get current queue state
+        Queue queue = queueService.getOrCreateQueue(centerId);
+        int currentServing = queue.getCurrentServingNumber() == null ? 0 : queue.getCurrentServingNumber();
+
+        // Validate user is actually in queue (not already served)
+        if (userBooking.getQueueNumber() <= currentServing) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User has already been served");
+        }
+
+        // 2. Mark user as SERVED or remove from queue
+        // Option 1: Remove from queue (cleaner approach)
+        bookingRepository.delete(userBooking);
+
+        // 3. Increment currentServingNumber in MySQL queue table
+        queue.setCurrentServingNumber(currentServing + 1);
+        queueService.updateQueue(queue);
+
+        // 4. Save updated queue state in MySQL (already done by updateQueue)
+
+        // 5. Insert SERVE_NEXT log in MongoDB
+        activityService.log(userId, centerId, "SERVE_USER");
+
+        // 6. Return updated queue status
+        QueueStatusResponse response = new QueueStatusResponse();
+        response.setCurrentServingNumber(queue.getCurrentServingNumber());
+        response.setRemainingUsers(bookingRepository.findByCenterIdOrderByQueueNumberAsc(centerId));
+        response.setMessage("User served successfully");
+
+        return response;
+    }
+
+    // Get queue users for a specific center
+    public List<Booking> getQueueUsers(Long centerId) {
+        return bookingRepository.findByCenterIdOrderByQueueNumberAsc(centerId);
+    }
 }
