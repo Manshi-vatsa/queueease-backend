@@ -74,3 +74,4 @@ It eliminates physical waiting lines by providing a structured queue management 
 ```bash
 git clone https://github.com/your-username/queueease-backend.git
 cd queueease-backend
+

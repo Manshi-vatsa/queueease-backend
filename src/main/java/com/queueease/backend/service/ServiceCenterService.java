@@ -1,6 +1,6 @@
 package com.queueease.backend.service;
 
-import com.queueease.backend.model.ServiceCenter;
+import com.queueease.backend.model.CenterResponse;
 import com.queueease.backend.repository.ServiceCenterRepository;
 import org.springframework.stereotype.Service;
 
@@ -15,11 +15,11 @@ public class ServiceCenterService {
         this.repository = repository;
     }
 
-    public List<ServiceCenter> getAllCenters() {
+    public List<CenterResponse> getAllCenters() {
         return repository.findAll();
     }
 
-    public ServiceCenter addCenter(ServiceCenter center) {
+    public CenterResponse addCenter(CenterResponse center) {
         return repository.save(center);
     }
 }
