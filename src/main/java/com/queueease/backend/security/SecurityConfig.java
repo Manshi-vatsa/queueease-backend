@@ -53,6 +53,7 @@ public class SecurityConfig {
 
                 // ✅ Everything else requires auth (UNCHANGED)
                 .anyRequest().authenticated()
+                
             )
 
             .sessionManagement(session ->
