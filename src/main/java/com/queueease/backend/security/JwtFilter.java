@@ -18,16 +18,16 @@ import java.util.List;
 @Component
 public class JwtFilter extends OncePerRequestFilter {
 
-    private final JwtUtil jwtUtil;
-    
-    public JwtFilter(JwtUtil jwtUtil) {
-        this.jwtUtil = jwtUtil;
-    }
+private final JwtUtil jwtUtil;
 
-    @Override
+public JwtFilter(JwtUtil jwtUtil) {
+    this.jwtUtil = jwtUtil;
+}
+
+@Override
 protected void doFilterInternal(HttpServletRequest request,
-                               HttpServletResponse response,
-                               FilterChain filterChain)
+                                HttpServletResponse response,
+                                FilterChain filterChain)
         throws ServletException, IOException {
 
     System.out.println("🔥 JWT FILTER HIT");
@@ -35,14 +35,22 @@ protected void doFilterInternal(HttpServletRequest request,
     String path = request.getRequestURI();
     System.out.println("PATH: " + path);
 
-    // ✅ Skip JWT for auth + H2 console
-    if (path.startsWith("/api/auth") || path.startsWith("/h2-console")) {
+    // ✅ Skip JWT for public routes
+    if (
+            path.startsWith("/api/auth") ||
+            path.startsWith("/h2-console") ||
+            path.startsWith("/swagger-ui") ||
+            path.startsWith("/v3/api-docs") ||
+            path.equals("/swagger-ui.html") ||
+            path.startsWith("/error")
+    ) {
         filterChain.doFilter(request, response);
         return;
     }
 
     String authHeader = request.getHeader("Authorization");
 
+    // ✅ No token
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
         System.out.println("❌ No token");
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -52,6 +60,7 @@ protected void doFilterInternal(HttpServletRequest request,
     String token = authHeader.substring(7);
 
     try {
+
         String email = jwtUtil.extractEmail(token);
 
         System.out.println("EMAIL: " + email);
@@ -72,11 +81,14 @@ protected void doFilterInternal(HttpServletRequest request,
         }
 
     } catch (Exception e) {
+
         System.out.println("❌ TOKEN ERROR: " + e.getMessage());
+
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         return;
     }
 
     filterChain.doFilter(request, response);
 }
+
 }

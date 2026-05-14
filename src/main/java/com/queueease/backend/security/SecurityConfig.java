@@ -15,53 +15,61 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class SecurityConfig {
 
-    private final JwtFilter jwtFilter;
+private final JwtFilter jwtFilter;
 
-    public SecurityConfig(JwtFilter jwtFilter) {
-        this.jwtFilter = jwtFilter;
-    }
+public SecurityConfig(JwtFilter jwtFilter) {
+    this.jwtFilter = jwtFilter;
+}
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        http
-            .csrf(csrf -> csrf.disable())
+    http
+        .csrf(csrf -> csrf.disable())
 
-            // ✅ IMPORTANT for H2 console
-            .headers(headers -> headers.frameOptions(frame -> frame.disable()))
+        // ✅ IMPORTANT for H2 console
+        .headers(headers -> headers.frameOptions(frame -> frame.disable()))
 
-            .authorizeHttpRequests(auth -> auth
-                // ✅ Allow auth APIs
-                .requestMatchers("/api/auth/**").permitAll()
+        .authorizeHttpRequests(auth -> auth
 
-                // ✅ Allow H2 console
-                .requestMatchers("/h2-console/**").permitAll()
+            // ✅ Allow auth APIs
+            .requestMatchers("/api/auth/**").permitAll()
 
-                // ✅ Allow error
-                .requestMatchers("/error").permitAll()
+            // ✅ Allow H2 console
+            .requestMatchers("/h2-console/**").permitAll()
 
-                // ✅ ✅ ADD THIS LINE (ONLY CHANGE)
-                .requestMatchers("/test").permitAll()
+            // ✅ Allow error
+            .requestMatchers("/error").permitAll()
 
-                // ✅ Your existing protected API (UNCHANGED)
-                .requestMatchers("/api/queue/**").hasRole("USER")
+            // ✅ Allow test endpoint
+            .requestMatchers("/test").permitAll()
 
-                // ✅ Everything else requires auth (UNCHANGED)
-                .anyRequest().authenticated()
-                
-            )
+            // ✅ Swagger/OpenAPI access
+            .requestMatchers(
+                "/swagger-ui/**",
+                "/swagger-ui.html",
+                "/v3/api-docs/**"
+            ).permitAll()
 
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
+            // ✅ Protected APIs
+            .requestMatchers("/api/queue/**").hasRole("USER")
 
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+            // ✅ Everything else requires authentication
+            .anyRequest().authenticated()
+        )
 
-        return http.build();
-    }
+        .sessionManagement(session ->
+            session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+        )
+
+        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
+    return http.build();
+}
+
 }
